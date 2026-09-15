@@ -7,8 +7,17 @@ jobs:
   builder:
     runs-on: ubuntu-latest
     timeout-minutes: 360
-
     steps:
+      - name: Free Disk Space
+        uses: endersonmenezes/free-disk-space@v4
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          remove_swap: true
+      - name: Check Disk
+        run: df -h
       - name: Start BuildKit
         run: |
           docker run -d \
@@ -30,25 +39,6 @@ jobs:
             --no-autoupdate \
             run \
             --token "$TUNNEL_TOKEN"
-      - name: Debug builder
-        run: |
-          echo "=== CONTAINERS ==="
-          docker ps
-
-          echo "=== CLOUDFLARED NETWORK ==="
-          docker inspect -f '{{.HostConfig.NetworkMode}}' cloudflared
-
-          echo "=== BUILDKIT PORT ==="
-          docker port buildkit || true
-
-          echo "=== HOST PORT TEST ==="
-          nc -vz 127.0.0.1 1234 || true
-
-          echo "=== CLOUDFLARED LOG ==="
-          docker logs cloudflared --tail 100
-
-          echo "=== BUILDKIT LOG ==="
-          docker logs buildkit --tail 100
       - name: Keep builder alive
         run: |
           echo "Remote builder ready"
