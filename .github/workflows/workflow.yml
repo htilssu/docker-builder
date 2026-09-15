@@ -26,7 +26,7 @@ jobs:
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           cloudflared access tcp \
-            --hostname buildkit.example.com \
+            --hostname buildkit.hommi.io.vn \
             --url 127.0.0.1:1234 \
             > /tmp/cloudflared.log 2>&1 &
 
