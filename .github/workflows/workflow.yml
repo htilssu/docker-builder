@@ -21,6 +21,9 @@ jobs:
           chmod +x /usr/local/bin/cloudflared
 
       - name: Start Cloudflare TCP proxy
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           cloudflared access tcp \
             --hostname buildkit.example.com \
