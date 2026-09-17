@@ -3,6 +3,9 @@ name: Remote Builder
 on:
   workflow_dispatch:
 
+permissions:
+  actions: write
+
 jobs:
   builder:
     runs-on: ubuntu-latest
@@ -44,3 +47,36 @@ jobs:
         run: |
           echo "Remote builder ready"
           sleep infinity
+
+  restart:
+    needs: builder
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch next workflow run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_REF: ${{ github.ref_name }}
+        run: |
+          # Only renew an expired builder; setup failures must remain visible.
+          jobs=$(curl --fail-with-body --silent --show-error \
+            --connect-timeout 15 --max-time 60 \
+            --url "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28")
+          if ! jq -e 'any(.jobs[]; .name == "builder" and .conclusion == "timed_out")' <<< "$jobs" > /dev/null; then
+            echo "Builder did not time out; skipping dispatch."
+            exit 0
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 15 --max-time 60 \
+            --request POST \
+            --url "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/workflow.yml/dispatches" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --header "Content-Type: application/json" \
+            --data "$(jq -cn --arg ref "$WORKFLOW_REF" '{ref: $ref}')"
