@@ -46,11 +46,12 @@ jobs:
       - name: Keep builder alive
         run: |
           echo "Remote builder ready"
-          sleep infinity
+          # Finish normally before the 6-hour job limit, allowing time for setup.
+          sleep 21000
 
   restart:
     needs: builder
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.builder.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -59,18 +60,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WORKFLOW_REF: ${{ github.ref_name }}
         run: |
-          # Only renew an expired builder; setup failures must remain visible.
-          jobs=$(curl --fail-with-body --silent --show-error \
-            --connect-timeout 15 --max-time 60 \
-            --url "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28")
-          if ! jq -e 'any(.jobs[]; .name == "builder" and .conclusion == "timed_out")' <<< "$jobs" > /dev/null; then
-            echo "Builder did not time out; skipping dispatch."
-            exit 0
-          fi
-
+          # Renew only after the builder completes successfully.
           curl --fail-with-body --silent --show-error \
             --connect-timeout 15 --max-time 60 \
             --request POST \
